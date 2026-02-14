@@ -21,7 +21,10 @@ Route table:
 
 	GET  /api/v1/health     — Public: server and DB health check
 	POST /api/v1/register   — Public: create a new user registration
-	POST /api/v1/projects   — PM only: create a new project
+	GET  /api/v1/projects      — Authenticated: list user's created/assigned projects
+	GET  /api/v1/projects/:id       — Authenticated: get details of a specific project
+	POST /api/v1/projects           — PM only: create a new project
+	POST /api/v1/projects/:id/bugs  — Authenticated: create bugs in a project (batch)
 */
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
@@ -38,6 +41,11 @@ func SetupRouter() *gin.Engine {
 		auth := api.Group("")
 		auth.Use(middleware.AuthMiddleware())
 		{
+			// All authenticated users can view their projects
+			auth.GET("/projects", handlers.GetProjects)
+			auth.GET("/projects/:id", handlers.GetProjectByID)
+			auth.POST("/projects/:id/bugs", handlers.CreateBugs)
+
 			// ── PM-only routes (JWT + "PM" role required) ──
 			pm := auth.Group("")
 			pm.Use(middleware.RequireRole("PM"))

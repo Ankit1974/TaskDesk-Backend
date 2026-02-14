@@ -44,3 +44,11 @@ type Project struct {
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
+
+// ProjectListResponse wraps a paginated list of projects for GET /api/v1/projects.
+type ProjectListResponse struct {
+	Projects   []Project `json:"projects"`
+	TotalCount int       `json:"total_count"`
+	Page       int       `json:"page"`
+	Limit      int       `json:"limit"`
+}
