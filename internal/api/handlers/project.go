@@ -16,9 +16,6 @@ import (
 )
 
 // generateWorkspaceID creates a short, human-readable workspace identifier.
-// Format: first 3 chars of project name (uppercased) + "-" + last 4 chars of base36-encoded timestamp.
-// Example: "E-Commerce Platform" -> "E-C-K1R2"
-// Falls back to "UNK" prefix if the project name is empty.
 func generateWorkspaceID(projectName string) string {
 	name := strings.TrimSpace(projectName)
 	prefix := "UNK"
@@ -38,13 +35,6 @@ func generateWorkspaceID(projectName string) string {
 }
 
 // CreateProject handles project creation. Only accessible by users with the "PM" role.
-// It validates the request, generates a workspace ID, inserts into the projects table,
-// and returns the full project record.
-//
-// Route: POST /api/v1/projects (requires Auth + PM role)
-//
-// Request body: { project_name, description, icon, teams?, start_date? }
-// Success response: 201 Created with the full project record
 // Error responses: 400 (validation), 401 (unauthenticated), 403 (not PM), 500 (database error)
 func CreateProject(c *gin.Context) {
 	// Get the authenticated user (set by AuthMiddleware)
@@ -64,7 +54,7 @@ func CreateProject(c *gin.Context) {
 	// Generate a unique workspace identifier for the project
 	workspaceID := generateWorkspaceID(input.ProjectName)
 
-	// Parse the optional start_date (expects ISO format: YYYY-MM-DD)
+	// Parse the optional start_date
 	var startDate *time.Time
 	if input.StartDate != "" {
 		parsed, err := time.Parse("2006-01-02", input.StartDate)
@@ -80,7 +70,6 @@ func CreateProject(c *gin.Context) {
 	defer cancel()
 
 	// Insert the project with default status "planning", progress 0, member_count 0.
-	// RETURNING clause fetches the auto-generated fields in a single round-trip.
 	query := `
 		INSERT INTO projects (project_name, description, icon, teams, start_date, status, workspace_id, created_by)
 		VALUES ($1, $2, $3, $4, $5, 'planning', $6, $7)
@@ -91,7 +80,7 @@ func CreateProject(c *gin.Context) {
 	var project model.Project
 	project.ProjectName = input.ProjectName
 	project.Description = input.Description
-	project.Icon = input.Icon
+	//project.Icon = input.Icon
 	project.Teams = input.Teams
 	if project.Teams == nil {
 		project.Teams = []string{} // Ensure JSON serializes as [] instead of null
@@ -103,9 +92,9 @@ func CreateProject(c *gin.Context) {
 	err := db.Pool.QueryRow(ctx, query,
 		input.ProjectName,
 		input.Description,
-		input.Icon,
-		input.Teams,         // pgx natively converts []string to PostgreSQL TEXT[]
-		startDate,           // nil becomes SQL NULL for optional dates
+		//input.Icon,
+		input.Teams, // pgx natively converts []string to PostgreSQL TEXT[]
+		startDate,   // nil becomes SQL NULL for optional dates
 		workspaceID,
 		user.RegistrationID, // The PM's registration UUID
 	).Scan(

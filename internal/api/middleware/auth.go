@@ -1,13 +1,4 @@
 // Package middleware provides Gin middleware functions for authentication
-// and authorization. It validates Supabase JWTs and enforces role-based
-// access control (RBAC) on protected routes.
-//
-// Middleware chain example:
-//
-//	auth := api.Group("")
-//	auth.Use(middleware.AuthMiddleware())   // verifies JWT, loads user
-//	pm := auth.Group("")
-//	pm.Use(middleware.RequireRole("PM"))    // restricts to PM role only
 package middleware
 
 import (
@@ -24,9 +15,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// UserContext holds the authenticated user's information extracted from the
-// JWT token and the registrations database table. It is stored in the Gin
-// context by AuthMiddleware and retrieved by handlers via GetUser().
+/*
+	    UserContext holds the authenticated user's information extracted from the
+		JWT token and the registrations database table. It is stored in the Gin
+		context by AuthMiddleware and retrieved by handlers via GetUser().
+*/
 type UserContext struct {
 	SupabaseUserID string // Supabase auth.users UUID (from JWT "sub" claim)
 	Email          string // User's email address (from JWT "email" claim)
@@ -37,17 +30,19 @@ type UserContext struct {
 // UserContextKey is the key used to store/retrieve UserContext in the Gin context.
 const UserContextKey = "user"
 
-// AuthMiddleware validates the Supabase JWT from the Authorization header
-// and loads the user's registration data from the database.
-//
-// Flow:
-//  1. Extract "Bearer <token>" from the Authorization header
-//  2. Parse and validate the JWT using the Supabase JWT secret (HMAC-SHA256)
-//  3. Extract the "email" claim from the token
-//  4. Query the registrations table to get the user's ID and role
-//  5. Store the UserContext in Gin's context for downstream handlers
-//
-// Returns 401 Unauthorized if any step fails.
+/*
+	AuthMiddleware validates the Supabase JWT from the Authorization header
+	and loads the user's registration data from the database.
+*/
+/*
+	Flow:
+	  1. Extract "Bearer <token>" from the Authorization header
+	  2. Parse and validate the JWT using the Supabase JWT secret (HMAC-SHA256)
+	  3. Extract the "email" claim from the token
+	  4. Query the registrations table to get the user's ID and role
+	  5. Store the UserContext in Gin's context for downstream handlers
+*/
+
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Step 1: Extract the Bearer token from the Authorization header
@@ -78,8 +73,8 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		supabaseUserID, _ := claims["sub"].(string)   // Supabase user UUID
-		email, _ := claims["email"].(string)           // User email from Supabase auth
+		supabaseUserID, _ := claims["sub"].(string) // Supabase user UUID
+		email, _ := claims["email"].(string)        // User email from Supabase auth
 
 		if email == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token missing email claim"})

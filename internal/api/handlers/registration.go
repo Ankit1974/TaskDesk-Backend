@@ -11,15 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Register handles new user registration.
-// It validates the request body, inserts the user into the registrations table,
-// and returns the created record with the auto-generated ID and timestamp.
-//
-// Route: POST /api/v1/register (public, no auth required)
-//
-// Request body: { full_name, email, organisation_name, role }
-// Success response: 201 Created with the full registration record
-// Error responses: 400 (validation), 500 (database error)
+/*
+It validates the request body, inserts the user into the registrations table,
+Success response: 201 Created with the full registration recsord
+Error responses: 400 (validation), 500 (database error)
+*/
 func Register(c *gin.Context) {
 	// Bind and validate the JSON request body against model.Registration rules
 	var input model.Registration

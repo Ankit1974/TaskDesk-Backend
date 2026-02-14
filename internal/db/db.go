@@ -1,8 +1,10 @@
-// Package db manages the PostgreSQL database connection pool.
-// It uses pgx/v5 with connection pooling to efficiently handle concurrent
-// database requests across the application.
-//
-// Usage: Access the pool from any package as db.Pool (e.g., db.Pool.QueryRow(...)).
+/*
+Package db manages the PostgreSQL database connection pool.
+It uses pgx/v5 with connection pooling to efficiently handle concurrent
+database requests across the application.
+
+Usage: Access the pool from any package as db.Pool (e.g., db.Pool.QueryRow(...)).
+*/
 package db
 
 import (
@@ -14,9 +16,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Pool is the global database connection pool.
-// It manages multiple reusable connections to the Supabase PostgreSQL database.
-// Must be initialized via InitDB() before use.
+/*
+Pool is the global database connection pool.
+It manages multiple reusable connections to the Supabase PostgreSQL database.
+Must be initialized via InitDB() before use.
+*/
 var Pool *pgxpool.Pool
 
 // InitDB creates and validates a connection pool using the provided connection string.
