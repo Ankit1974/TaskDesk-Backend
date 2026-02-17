@@ -71,8 +71,8 @@ func CreateProject(c *gin.Context) {
 
 	// Insert the project with default status "planning", progress 0, member_count 0.
 	query := `
-		INSERT INTO projects (project_name, description, icon, teams, start_date, status, workspace_id, created_by)
-		VALUES ($1, $2, $3, $4, $5, 'planning', $6, $7)
+		INSERT INTO projects (project_name, description, teams, start_date, status, workspace_id, created_by)
+		VALUES ($1, $2, $3, $4, 'planning', $5, $6)
 		RETURNING id, status, progress, member_count, created_at, updated_at
 	`
 

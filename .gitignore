@@ -19,6 +19,7 @@ server
 .env
 .env.local
 .env.*.local
+*.postman_collection.json
 
 # OS generated files
 .DS_Store

@@ -37,6 +37,13 @@ func LoadConfig() *Config {
 	// Also read from actual environment variables (takes precedence over .env)
 	viper.AutomaticEnv()
 
+	// Explicitly bind environment variables to ensure they are picked up
+	// even if the config file is missing (common in Docker).
+	_ = viper.BindEnv("SUPABASE_URL")
+	_ = viper.BindEnv("SUPABASE_ANON_KEY")
+	_ = viper.BindEnv("SUPABASE_JWT_SECRET")
+	_ = viper.BindEnv("DATABASE_URL")
+
 	if err := viper.ReadInConfig(); err != nil {
 		log.Printf("Warning: .env file not found, using default and env variables: %v", err)
 	}
