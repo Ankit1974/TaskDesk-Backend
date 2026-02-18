@@ -3,9 +3,15 @@ package middleware
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Ankit1974/TaskDeskBackend/internal/config"
@@ -14,6 +20,96 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
+
+// JWKS types and cache for Supabase ES256 public key verification
+type jwksResponse struct {
+	Keys []jwkKey `json:"keys"`
+}
+
+type jwkKey struct {
+	Kty string `json:"kty"`
+	Kid string `json:"kid"`
+	Crv string `json:"crv"`
+	X   string `json:"x"`
+	Y   string `json:"y"`
+}
+
+var (
+	jwksCache     map[string]*ecdsa.PublicKey
+	jwksCacheMu   sync.RWMutex
+	jwksCacheTime time.Time
+	jwksCacheTTL  = 1 * time.Hour
+)
+
+// fetchJWKS fetches and caches the Supabase JWKS public keys
+func fetchJWKS() error {
+	jwksURL := config.Cfg.SupabaseURL + "/auth/v1/.well-known/jwks.json"
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(jwksURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch JWKS: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var jwks jwksResponse
+	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+		return fmt.Errorf("failed to decode JWKS: %w", err)
+	}
+
+	keys := make(map[string]*ecdsa.PublicKey)
+	for _, key := range jwks.Keys {
+		if key.Kty != "EC" || key.Crv != "P-256" {
+			continue
+		}
+		xBytes, err := base64.RawURLEncoding.DecodeString(key.X)
+		if err != nil {
+			continue
+		}
+		yBytes, err := base64.RawURLEncoding.DecodeString(key.Y)
+		if err != nil {
+			continue
+		}
+		pubKey := &ecdsa.PublicKey{
+			Curve: elliptic.P256(),
+			X:     new(big.Int).SetBytes(xBytes),
+			Y:     new(big.Int).SetBytes(yBytes),
+		}
+		keys[key.Kid] = pubKey
+	}
+
+	jwksCacheMu.Lock()
+	jwksCache = keys
+	jwksCacheTime = time.Now()
+	jwksCacheMu.Unlock()
+
+	return nil
+}
+
+// getPublicKey returns the cached ECDSA public key for the given kid
+func getPublicKey(kid string) (*ecdsa.PublicKey, error) {
+	jwksCacheMu.RLock()
+	needsRefresh := jwksCache == nil || time.Since(jwksCacheTime) > jwksCacheTTL
+	if !needsRefresh {
+		if key, ok := jwksCache[kid]; ok {
+			jwksCacheMu.RUnlock()
+			return key, nil
+		}
+	}
+	jwksCacheMu.RUnlock()
+
+	// Fetch fresh keys
+	if err := fetchJWKS(); err != nil {
+		return nil, err
+	}
+
+	jwksCacheMu.RLock()
+	defer jwksCacheMu.RUnlock()
+	if key, ok := jwksCache[kid]; ok {
+		return key, nil
+	}
+	return nil, fmt.Errorf("key ID %q not found in JWKS", kid)
+}
 
 /*
 	    UserContext holds the authenticated user's information extracted from the
@@ -53,13 +149,22 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// Step 2: Parse and validate the JWT using Supabase's signing secret
+		// Step 2: Parse and validate the JWT (supports both ES256 and HS256)
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Ensure the token uses HMAC signing (Supabase uses HS256)
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			switch token.Method.(type) {
+			case *jwt.SigningMethodECDSA:
+				// ES256: verify using Supabase JWKS public key
+				kid, _ := token.Header["kid"].(string)
+				if kid == "" {
+					return nil, fmt.Errorf("missing kid in token header")
+				}
+				return getPublicKey(kid)
+			case *jwt.SigningMethodHMAC:
+				// HS256: verify using shared secret
+				return []byte(config.Cfg.SupabaseJWTSecret), nil
+			default:
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return []byte(config.Cfg.SupabaseJWTSecret), nil
 		})
 		if err != nil || !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
