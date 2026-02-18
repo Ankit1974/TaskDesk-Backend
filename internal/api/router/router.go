@@ -48,7 +48,7 @@ func SetupRouter() *gin.Engine {
 
 			// ── PM-only routes (JWT + "PM" role required) ──
 			pm := auth.Group("")
-			pm.Use(middleware.RequireRole("PM"))
+			pm.Use(middleware.RequireRole("PM", "Project Manager"))
 			{
 				pm.POST("/projects", handlers.CreateProject)
 			}
